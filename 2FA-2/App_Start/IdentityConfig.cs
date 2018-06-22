@@ -11,25 +11,60 @@ using Microsoft.AspNet.Identity.Owin;
 using Microsoft.Owin;
 using Microsoft.Owin.Security;
 using _2FA_2.Models;
+using Twilio;
+using Twilio.Rest.Api.V2010.Account;
+using SendGrid;
+using SendGrid.Helpers.Mail;
+using System.Configuration;
+using System.Net;
+using System.Diagnostics;
+using Twilio.Clients;
+
+
 
 namespace _2FA_2
 {
     public class EmailService : IIdentityMessageService
     {
-        public Task SendAsync(IdentityMessage message)
+        public async Task SendAsync(IdentityMessage message)
         {
-            // Plug in your email service here to send an email.
-            return Task.FromResult(0);
+            await configSendGridasync(message);
+        }
+    
+
+        // Use NuGet to install SendGrid (Basic C# client lib) 
+        private async Task configSendGridasync(IdentityMessage message)
+        {
+            var value = Environment.GetEnvironmentVariable("SENDGRID_API_KEY");
+            if (value == null)
+                Environment.SetEnvironmentVariable("SENDGRID_API_KEY", ConfigurationManager.AppSettings["SendGridAPIKey"]);
+
+            var apiKey = Environment.GetEnvironmentVariable("SENDGRID_API_KEY");
+            var client = new SendGridClient(apiKey);
+            var from = new EmailAddress("test@example.com", "Example User");
+            var subject = message.Subject;
+            var to = new EmailAddress(message.Destination, "New User");
+            var plainTextContent = message.Body;
+            var htmlContent = message.Body;
+
+            var msg = MailHelper.CreateSingleEmail(from, to, subject, plainTextContent, htmlContent);
+            var response = await client.SendEmailAsync(msg);
         }
     }
 
     public class SmsService : IIdentityMessageService
     {
-        public Task SendAsync(IdentityMessage message)
+        public async Task SendAsync(IdentityMessage message)
         {
-            // Plug in your SMS service here to send a text message.
-            return Task.FromResult(0);
+           // Plug in your SMS service here to send a text message.
+           TwilioClient.Init(ConfigurationManager.AppSettings["TwilioSID"], ConfigurationManager.AppSettings["TwilioAuthToken"]);
+            var SMSmessage = await MessageResource.CreateAsync(
+                body: message.Body,
+                from: new Twilio.Types.PhoneNumber(ConfigurationManager.AppSettings["TwilioNumber"]),
+                to: new Twilio.Types.PhoneNumber(message.Destination)
+           );
         }
+
     }
 
     // Configure the application user manager used in this application. UserManager is defined in ASP.NET Identity and is used by the application.
@@ -107,3 +142,36 @@ namespace _2FA_2
         }
     }
 }
+
+
+
+
+//private async Task configSendGridasync(IdentityMessage message)
+//{
+//    var myMessage = new SendGridMessage();
+//    myMessage.AddTo(message.Destination);
+//    myMessage.From = new SendGrid.Helpers.Mail.EmailAddress(
+//                        "Joe@contoso.com", "Joe S.");
+//    myMessage.Subject = message.Subject;
+//    myMessage.PlainTextContent = message.Body;
+//    myMessage.HtmlContent = message.Body;
+
+//    var credentials = new NetworkCredential(
+//               ConfigurationManager.AppSettings["mailAccount"],
+//               ConfigurationManager.AppSettings["mailPassword"]
+//               );
+
+//    // Create a Web transport for sending email.
+//    var transportWeb = new Web(credentials);
+
+//    // Send the email.
+//    if (transportWeb != null)
+//    {
+//        await transportWeb.DeliverAsync(myMessage);
+//    }
+//    else
+//    {
+//        Trace.TraceError("Failed to create Web transport.");
+//        await Task.FromResult(0);
+//    }
+//}

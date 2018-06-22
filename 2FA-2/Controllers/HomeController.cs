@@ -20,6 +20,7 @@ namespace _2FA_2.Controllers
             return View();
         }
 
+        [Authorize]
         public ActionResult Contact()
         {
             ViewBag.Message = "Your contact page.";
